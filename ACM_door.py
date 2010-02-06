@@ -4,11 +4,13 @@ from Phidgets.Devices.RFID import *
 import os
 import time
 import datetime
+import threading
 from BeautifulSoup import BeautifulStoneSoup
 
 #GLOBALS
 tag = "210050A70B"
 door_open = False
+new_xml_exists = False
 #Arbitrary initial value for since_id
 since_id = "8711950820"
 
@@ -22,15 +24,25 @@ def displayDeviceInfo():
     print("Number of outputs: %i -- Antenna Status: %s -- Onboard LED Status: %s" % (rfid.getOutputCount(), rfid.getAntennaOn(), rfid.getLEDOn()))
 
 
-def sinceIDReply()
+def sinceIDReply():
+    print "SinceIDReply"
 #Figure out threading.Timer to call this function every 5 minutes or something.
     message = "curl -u acmroom:bluepin7 http://twitter.com/statuses/mentions.xml?since_id=%s" % since_id
     response = os.popen(message)
+    soup = BeautifulStoneSoup(response)    
     
-    print soup.prettify()
+    #print soup.prettify()
+
+    statuses = soup.find('statuses').string
+    if(statuses == ''):
+        new_xml_exists = False
+        return 0
+    new_xml_exists = True
     screen_name = soup.find('screen_name').string
     #Get the new id
     since_id = soup.find('id').string
+    
+    
 
 #Event Handler Callback Functions
 def rfidAttached(e):
@@ -117,8 +129,10 @@ try:
     #Get the most recent id, new or old.
     since_id = soup.find('id').string
 
-
-    if(since_id >  && door_open):
+    #Should call sinceIDReply every 5 seconds
+    thread = threading.Timer(5.0, sinceIDReply)
+    thread.start()
+    if(new_xml_exists and door_open):
         message = "curl -u acmroom:bluepin7 -d status=\"Hey @%s , the door is open,  come visit. \" http://twitter.com/statuses/update.json" % screen_name
         os.system(message)
 
