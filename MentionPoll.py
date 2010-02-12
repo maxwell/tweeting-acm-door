@@ -1,31 +1,31 @@
-import RepeatTimer
+import threading
 import os
 from BeautifulSoup import BeautifulStoneSoup
 
 new_xml_exists = False
 #Arbitrary initial value for since_id                                                        
 since_id = "8711950820"
-screen_name = "";
+screen_name = ""
+lock = threading.Lock()
 
-
-def sinceIDReply(id):
-    print "SinceIDReply"
-#Figure out threading.Timer to call this function every 5 minutes or something.                
-    message = "curl -u acmroom:bluepin7 http://twitter.com/statuses/mentions.xml?since_id=%s" \
-% id
+def getNewMention(id):
+    lock.acquire()
+    id = str(id)
+    message = "curl -u acmroom:bluepin7 http://twitter.com/statuses/mentions.xml?since_id=%s" % id
     response = os.popen(message)
     #print soup.prettify()
     soup = BeautifulStoneSoup(response)
+    new_xml_exists = True
     try:
         screen_name = soup.find('screen_name').string
     except AttributeError as e:
-        print ("\n'screen_name' tag was not find in XML:")
-        print ("%s" % soup.prettify())
+        new_xml_exists = False
+        print ("\n'screen_name' tag was not found in XML:")
+        print ("%s" % soup)
         return None
-    new_xml_exists = True
     print "I am at findid"
     since_id = soup.find('id').string
-    return since_id, screen_name
+    lock.release()
 
 def initTwitterPolling():
 #Initially we request 1 most recent mention (count = 1)
@@ -43,9 +43,13 @@ def initTwitterPolling():
         print(" XML may not have been returned by Twitter.")
         print " Twitter: %s" % error
         print " Exiting....."
-        exit(1)
-    r = RepeatTimer(10.0, sinceIDReply, args=since_id)
-    r.start()
+        exit(1);
+    t = threading.Timer(10.0, getNewMention, args = [int(since_id)])
+    t.start()
+    condition = threading.Condition([lock])
+    while :
+        t = threading.Timer(10.0, getNewMention, args = [int(since_id)])
+        t.start()
 
 try:
     initTwitterPolling()
